@@ -47,6 +47,15 @@ chante — a cappella ou en jouant — et vois note par note où l'harmonie tien
 
 ## Journal de développement
 
+### 2026-07-25 — v1.2
+- Correctif : le collage depuis un chat mobile peut aplatir les retours à la ligne ;
+  la consigne entière devenait un commentaire (« Aucune note dans la consigne »).
+  Ajout d'un repli par jetons (`TEMPO 76 Sol#2 4 …` sur une ligne fonctionne),
+  tolérance aux espaces insécables.
+- Bouton « Insérer l'exemple » (refrain voix 2, Je l'aime à mourir) pour tester sans coller.
+- v1.1 : blocs cibles en ocre plein avec nom de note intégré, badge de version.
+- Vérifié dans Chromium mobile simulé : scénario du bug rejoué, 8 notes chargées.
+
 ### 2026-07-25 — v1
 - Création. Parseur de consignes (FR/EN, TEMPO, REPOS), conversion convention
   internationale / franco-belge, YIN validé sur sinus (±1 Hz à 220 Hz).
