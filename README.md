@@ -47,6 +47,12 @@ chante — a cappella ou en jouant — et vois note par note où l'harmonie tien
 
 ## Journal de développement
 
+### 2026-07-25 — v1.6
+- Bibliothèque de séquences nommées : enregistrer la consigne courante sous un nom,
+  la recharger depuis une liste, la supprimer. Persistance localStorage, nom pré-rempli
+  depuis la première ligne de commentaire si le champ est vide.
+- Vérifié en cycle complet dans Chromium : save → reload de page → sélection → suppression.
+
 ### 2026-07-25 — v1.5
 - Diagnostic de fin de prise : colonne « Chanté » (note médiane réellement produite par cible)
   et verdict global ancrage vs intervalles — si les écarts sont cohérents mais décalés,
