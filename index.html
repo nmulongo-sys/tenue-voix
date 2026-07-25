@@ -125,7 +125,7 @@
 <body>
 <header>
   <h1>Tenue de voix</h1>
-  <p>Colle la consigne, chante, vois où ça tient — et où ça lâche. <small style="opacity:.6">v1.5</small></p>
+  <p>Colle la consigne, chante, vois où ça tient — et où ça lâche. <small style="opacity:.6">v1.6</small></p>
 </header>
 <main>
 
@@ -134,6 +134,16 @@
   <textarea id="zoneConsigne" placeholder="# Refrain — voix 2&#10;TEMPO 76&#10;Sol#2 4&#10;La2 4&#10;Si2 4&#10;Do3 4"></textarea>
   <button id="btnCharger">Charger la consigne</button>
   <button id="btnExemple" class="secondaire">Insérer l'exemple</button>
+  <div style="margin-top:.8rem; display:flex; flex-wrap:wrap; gap:.4rem; align-items:center;">
+    <select id="selSequences" style="flex:1; min-width:9rem; padding:.5rem; border:1px solid var(--ocre-pale); border-radius:6px; background:var(--creme); font-size:.9rem;">
+      <option value="">— Mes séquences —</option>
+    </select>
+    <button id="btnSupprSeq" class="secondaire" style="margin:0;">Supprimer</button>
+  </div>
+  <div style="margin-top:.4rem; display:flex; flex-wrap:wrap; gap:.4rem; align-items:center;">
+    <input type="text" id="inNomSeq" placeholder="nom de la séquence" style="flex:1; min-width:9rem; padding:.5rem; border:1px solid var(--ocre-pale); border-radius:6px; background:var(--creme); font-size:.9rem;">
+    <button id="btnSauveSeq" style="margin:0;">Enregistrer la séquence</button>
+  </div>
   <details>
     <summary>Format de la consigne</summary>
     <pre># commentaire (ignoré)
@@ -750,9 +760,67 @@ function restaurer() {
   } catch (e) {}
 }
 
+/* ---------- Bibliothèque de séquences ---------- */
+function litSequences() {
+  try { return JSON.parse(localStorage.getItem("tenuevoix_seqs") || "{}"); } catch (e) { return {}; }
+}
+function ecritSequences(seqs) {
+  try { localStorage.setItem("tenuevoix_seqs", JSON.stringify(seqs)); } catch (e) {}
+}
+function rafraichitListeSeq(selectionner) {
+  const sel = $("selSequences");
+  const seqs = litSequences();
+  sel.innerHTML = '<option value="">— Mes séquences —</option>';
+  Object.keys(seqs).sort().forEach(nom => {
+    const o = document.createElement("option");
+    o.value = nom; o.textContent = nom;
+    sel.appendChild(o);
+  });
+  if (selectionner) sel.value = selectionner;
+}
+function sauveSequence() {
+  let nom = $("inNomSeq").value.trim();
+  if (!nom) {
+    // repli : première ligne de commentaire de la consigne
+    const m = /^#\s*(.+)$/m.exec($("zoneConsigne").value);
+    nom = m ? m[1].trim() : "";
+  }
+  if (!nom) { $("etat").textContent = "Donne un nom à la séquence."; $("etat").className = "rec"; return; }
+  if (!$("zoneConsigne").value.trim()) { $("etat").textContent = "La consigne est vide."; $("etat").className = "rec"; return; }
+  const seqs = litSequences();
+  seqs[nom] = $("zoneConsigne").value;
+  ecritSequences(seqs);
+  rafraichitListeSeq(nom);
+  $("inNomSeq").value = nom;
+  $("etat").textContent = "Séquence « " + nom + " » enregistrée.";
+  $("etat").className = "";
+}
+function chargeSequence() {
+  const nom = $("selSequences").value;
+  if (!nom) return;
+  const seqs = litSequences();
+  if (!(nom in seqs)) return;
+  $("zoneConsigne").value = seqs[nom];
+  $("inNomSeq").value = nom;
+  chargerConsigne();
+}
+function supprimeSequence() {
+  const nom = $("selSequences").value;
+  if (!nom) { $("etat").textContent = "Choisis d'abord une séquence dans la liste."; return; }
+  const seqs = litSequences();
+  delete seqs[nom];
+  ecritSequences(seqs);
+  rafraichitListeSeq("");
+  $("etat").textContent = "Séquence « " + nom + " » supprimée.";
+}
+
 /* ---------- Liaisons ---------- */
 if (typeof document !== "undefined" && document.getElementById && $("btnCharger")) {
   $("btnCharger").addEventListener("click", chargerConsigne);
+  $("btnSauveSeq").addEventListener("click", sauveSequence);
+  $("btnSupprSeq").addEventListener("click", supprimeSequence);
+  $("selSequences").addEventListener("change", chargeSequence);
+  rafraichitListeSeq("");
   $("btnExemple").addEventListener("click", () => {
     $("zoneConsigne").value = '# Refrain voix 2 - Je l\'aime a mourir (Do)\nTEMPO 76\nREPOS 16 "1er cycle : ecoute"\nSol#2 4 "entree"\nLa2 6 "tenue (Lam + Fa)"\nSi2 2 "monte"\nDo3 4 "unisson"';
     chargerConsigne();
