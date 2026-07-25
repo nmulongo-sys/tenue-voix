@@ -125,7 +125,7 @@
 <body>
 <header>
   <h1>Tenue de voix</h1>
-  <p>Colle la consigne, chante, vois où ça tient — et où ça lâche. <small style="opacity:.6">v1.1</small></p>
+  <p>Colle la consigne, chante, vois où ça tient — et où ça lâche. <small style="opacity:.6">v1.2</small></p>
 </header>
 <main>
 
@@ -133,6 +133,7 @@
   <h2>1 · Consigne</h2>
   <textarea id="zoneConsigne" placeholder="# Refrain — voix 2&#10;TEMPO 76&#10;Sol#2 4&#10;La2 4&#10;Si2 4&#10;Do3 4"></textarea>
   <button id="btnCharger">Charger la consigne</button>
+  <button id="btnExemple" class="secondaire">Insérer l'exemple</button>
   <details>
     <summary>Format de la consigne</summary>
     <pre># commentaire (ignoré)
@@ -220,9 +221,11 @@ function midiVersNom(midi) {
 
 /** Parse le texte de consigne → { tempo, notes:[{midi|null, beats, brut}] } ou { erreur } */
 function parseConsigne(texte, convention) {
+  texte = texte.replace(/\u00A0/g, " ");
   const notes = [];
   let tempo = null;
   const lignes = texte.split(/\r?\n/);
+  let erreurLigne = null;
   for (let i = 0; i < lignes.length; i++) {
     const l = lignes[i].trim();
     if (!l || l.startsWith("#")) continue;
@@ -233,13 +236,37 @@ function parseConsigne(texte, convention) {
     const mn = /^(\S+)\s+([\d.]+)$/.exec(l);
     if (mn) {
       const midi = nomVersMidi(mn[1], convention);
-      if (midi === null) return { erreur: "Ligne " + (i + 1) + " : note illisible « " + mn[1] + " »" };
+      if (midi === null) { erreurLigne = "Ligne " + (i + 1) + " : note illisible « " + mn[1] + " »"; break; }
       notes.push({ midi, beats: parseFloat(mn[2]), brut: mn[1] });
       continue;
     }
-    return { erreur: "Ligne " + (i + 1) + " : format non reconnu « " + l + " »" };
+    erreurLigne = "Ligne " + (i + 1) + " : format non reconnu « " + l + " »";
+    break;
   }
-  if (notes.filter(n => n.midi !== null).length === 0) return { erreur: "Aucune note dans la consigne." };
+  if (!erreurLigne && notes.filter(n => n.midi !== null).length > 0) {
+    return { tempo: tempo || 76, notes };
+  }
+  // Repli : le collage a peut-être perdu les retours à la ligne → lecture par jetons.
+  const repli = parseJetons(texte, convention);
+  if (repli) return repli;
+  return { erreur: erreurLigne || "Aucune note dans la consigne." };
+}
+
+/** Lecture par jetons : « TEMPO 76 Sol#2 4 La2 4 … » sur une seule ligne. */
+function parseJetons(texte, convention) {
+  const jetons = texte.split(/\s+/).filter(j => j.length);
+  const notes = [];
+  let tempo = null;
+  for (let i = 0; i < jetons.length - 1; i++) {
+    const j = jetons[i], suivant = jetons[i + 1];
+    if (/^TEMPO$/i.test(j) && /^\d+$/.test(suivant)) { tempo = parseInt(suivant, 10); i++; continue; }
+    if (/^REPOS$/i.test(j) && /^[\d.]+$/.test(suivant)) { notes.push({ midi: null, beats: parseFloat(suivant), brut: "repos" }); i++; continue; }
+    if (/^[\d.]+$/.test(suivant)) {
+      const midi = nomVersMidi(j, convention);
+      if (midi !== null) { notes.push({ midi, beats: parseFloat(suivant), brut: j }); i++; continue; }
+    }
+  }
+  if (notes.filter(n => n.midi !== null).length === 0) return null;
   return { tempo: tempo || 76, notes };
 }
 
@@ -629,6 +656,10 @@ function restaurer() {
 /* ---------- Liaisons ---------- */
 if (typeof document !== "undefined" && document.getElementById && $("btnCharger")) {
   $("btnCharger").addEventListener("click", chargerConsigne);
+  $("btnExemple").addEventListener("click", () => {
+    $("zoneConsigne").value = "# Refrain voix 2 - Je l'aime a mourir (Do)\nTEMPO 76\nSol#2 4\nLa2 4\nSol#2 4\nLa2 4\nSol#2 4\nLa2 6\nSi2 2\nDo3 4";
+    chargerConsigne();
+  });
   $("btnEcouter").addEventListener("click", ecouterCible);
   $("btnRec").addEventListener("click", demarrerRec);
   $("btnStop").addEventListener("click", finSession);
