@@ -125,7 +125,7 @@
 <body>
 <header>
   <h1>Tenue de voix</h1>
-  <p>Colle la consigne, chante, vois où ça tient — et où ça lâche.</p>
+  <p>Colle la consigne, chante, vois où ça tient — et où ça lâche. <small style="opacity:.6">v1.1</small></p>
 </header>
 <main>
 
@@ -570,14 +570,14 @@ function dessiner(tCourant) {
   // blocs cibles
   planning.forEach(p => {
     if (p.midi === null) return;
-    ctx2.fillStyle = "#e8d9b8";
-    ctx2.strokeStyle = "#c8963e";
-    const h = Math.max(6, (H - 40) / (maxM - minM) * 0.9);
+    const h = Math.max(14, (H - 40) / (maxM - minM) * 0.9);
+    ctx2.fillStyle = "#c8963e";
     ctx2.fillRect(x(p.debut), y(p.midi) - h / 2, x(p.fin) - x(p.debut) - 2, h);
+    ctx2.strokeStyle = "#4a3b2a";
     ctx2.strokeRect(x(p.debut), y(p.midi) - h / 2, x(p.fin) - x(p.debut) - 2, h);
-    ctx2.fillStyle = "#7a6a52";
-    ctx2.font = "11px Work Sans, sans-serif";
-    ctx2.fillText(midiVersNom(p.midi), x(p.debut) + 3, y(p.midi) - h / 2 - 3);
+    ctx2.fillStyle = "#fdfaf3";
+    ctx2.font = "bold 12px Work Sans, sans-serif";
+    ctx2.fillText(midiVersNom(p.midi), x(p.debut) + 4, y(p.midi) + 4);
   });
   // trace chantée
   const tol = parseFloat($("inTol").value) || 50;
