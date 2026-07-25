@@ -125,7 +125,7 @@
 <body>
 <header>
   <h1>Tenue de voix</h1>
-  <p>Colle la consigne, chante, vois où ça tient — et où ça lâche. <small style="opacity:.6">v1.3</small></p>
+  <p>Colle la consigne, chante, vois où ça tient — et où ça lâche. <small style="opacity:.6">v1.4</small></p>
 </header>
 <main>
 
@@ -163,7 +163,7 @@ Do3 4</pre>
     </label>
     <label><input type="checkbox" id="ckOctave"> Ignorer l'octave</label>
     <label><input type="checkbox" id="ckFiltre"> Je joue un instrument</label>
-    <label class="pleine-largeur"><input type="checkbox" id="ckGuide"> Guide sonore pendant l'enregistrement <small>(au casque !)</small></label>
+    <label class="pleine-largeur"><input type="checkbox" id="ckGuide"> Guide sonore pendant l'enregistrement <strong style="color:var(--rouge)">— casque obligatoire : au haut-parleur, le micro capte le guide et l'appli note le guide, pas ta voix</strong></label>
   </div>
   <p class="note-aide">« Je joue un instrument » coupe les fréquences sous ta note cible la plus basse
   pour que le micro ignore au mieux la basse ou la guitare. « Ignorer l'octave » valide la bonne
@@ -586,6 +586,9 @@ function calculerResultats() {
     corps.appendChild(tr);
   });
   $("verdictGlobal").textContent = tenues + " / " + total + " notes tenues";
+  if ($("ckGuide").checked) {
+    $("verdictGlobal").textContent += " — guide actif : fiable uniquement au casque";
+  }
   $("momentsLaches").textContent = laches.length ? "À retravailler : " + laches.join(", ") + "." : "Rien à signaler — tout tient.";
   $("secResultats").classList.remove("masque");
 }
