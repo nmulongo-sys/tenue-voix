@@ -47,6 +47,13 @@ chante — a cappella ou en jouant — et vois note par note où l'harmonie tien
 
 ## Journal de développement
 
+### 2026-07-25 — v1.3
+- Texte à chanter sous chaque bloc : format `Note durée "texte"` (aussi sur REPOS).
+  Guillemets typographiques des claviers mobiles tolérés ; fonctionne aussi en collage aplati.
+- Texte affiché dans les pastilles, sous les blocs du canvas (tronqué si trop long),
+  et dans le tableau de résultats.
+- Exemple intégré mis à jour : entrée différée (REPOS 16, 1er cycle en écoute) + repères.
+
 ### 2026-07-25 — v1.2
 - Correctif : le collage depuis un chat mobile peut aplatir les retours à la ligne ;
   la consigne entière devenait un commentaire (« Aucune note dans la consigne »).
