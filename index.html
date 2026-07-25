@@ -125,7 +125,7 @@
 <body>
 <header>
   <h1>Tenue de voix</h1>
-  <p>Colle la consigne, chante, vois où ça tient — et où ça lâche. <small style="opacity:.6">v1.4</small></p>
+  <p>Colle la consigne, chante, vois où ça tient — et où ça lâche. <small style="opacity:.6">v1.5</small></p>
 </header>
 <main>
 
@@ -163,6 +163,7 @@ Do3 4</pre>
     </label>
     <label><input type="checkbox" id="ckOctave"> Ignorer l'octave</label>
     <label><input type="checkbox" id="ckFiltre"> Je joue un instrument</label>
+    <label class="pleine-largeur"><input type="checkbox" id="ckDepart" checked> Donner la note de départ avant le décompte</label>
     <label class="pleine-largeur"><input type="checkbox" id="ckGuide"> Guide sonore pendant l'enregistrement <strong style="color:var(--rouge)">— casque obligatoire : au haut-parleur, le micro capte le guide et l'appli note le guide, pas ta voix</strong></label>
   </div>
   <p class="note-aide">« Je joue un instrument » coupe les fréquences sous ta note cible la plus basse
@@ -183,7 +184,7 @@ Do3 4</pre>
   <h2>4 · Résultats</h2>
   <div id="verdictGlobal"></div>
   <table>
-    <thead><tr><th>#</th><th>Note</th><th>Verdict</th><th>Justesse</th><th>Écart moyen</th></tr></thead>
+    <thead><tr><th>#</th><th>Cible</th><th>Chanté</th><th>Verdict</th><th>Justesse</th><th>Écart moyen</th></tr></thead>
     <tbody id="tbodyResultats"></tbody>
   </table>
   <div id="momentsLaches" class="note-aide"></div>
@@ -357,6 +358,24 @@ function yin(buf, sampleRate, seuil) {
   const freq = sampleRate / t;
   return (freq >= 50 && freq <= 1200) ? freq : null;
 }
+/** Midi médian (non replié) des trames voisées d'une note, ou null. */
+function midiMedian(trames) {
+  const midis = trames.filter(t => t.freq).map(t => 69 + 12 * Math.log2(t.freq / 440)).sort((a, b) => a - b);
+  if (!midis.length) return null;
+  return midis[Math.floor(midis.length / 2)];
+}
+
+/** Diagnostic global : écarts (midi chanté - midi cible) par note → verdict.
+    Retourne { type: "ancrage"|"intervalles"|"ok"|"insuffisant", decalage } */
+function diagnostiquePrise(ecarts) {
+  const e = ecarts.filter(x => x !== null);
+  if (e.length < 2) return { type: "insuffisant", decalage: 0 };
+  const moy = e.reduce((s, x) => s + x, 0) / e.length;
+  const disp = Math.sqrt(e.reduce((s, x) => s + (x - moy) * (x - moy), 0) / e.length);
+  if (disp <= 0.75 && Math.abs(moy) >= 0.75) return { type: "ancrage", decalage: Math.round(moy) };
+  if (disp <= 0.75) return { type: "ok", decalage: 0 };
+  return { type: "intervalles", decalage: Math.round(moy) };
+}
 /* ============================ ENDPURE ============================ */
 
 /* ---------- État global ---------- */
@@ -500,10 +519,26 @@ async function demarrerRec() {
   enCours = "rec";
   $("btnStop").classList.remove("masque");
 
-  // décompte : 4 temps
+  // décompte : note de départ optionnelle puis 4 temps
   const tempo = parseFloat($("inTempo").value) || consigne.tempo;
   const bat = 60 / tempo;
-  const maintenant = c.currentTime + 0.2;
+  let maintenant = c.currentTime + 0.2;
+  if ($("ckDepart").checked) {
+    const premiere = planning.find(p => p.midi !== null);
+    if (premiere) {
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = "triangle";
+      o.frequency.value = midiVersHz(premiere.midi);
+      g.gain.setValueAtTime(0.0001, maintenant);
+      g.gain.exponentialRampToValueAtTime(0.3, maintenant + 0.05);
+      g.gain.setValueAtTime(0.3, maintenant + 1.1);
+      g.gain.exponentialRampToValueAtTime(0.0001, maintenant + 1.4);
+      o.connect(g).connect(c.destination);
+      o.start(maintenant); o.stop(maintenant + 1.5);
+      noeudsGuide.push(o);
+      maintenant += 1.7;
+    }
+  }
   for (let i = 0; i < 4; i++) jouerClic(maintenant + i * bat, i === 0);
   t0 = maintenant + 4 * bat;
   if ($("ckGuide").checked) jouerGuide(t0, 0.12);
@@ -559,10 +594,19 @@ function finSession() {
 /* ---------- Résultats ---------- */
 function calculerResultats() {
   const tol = parseFloat($("inTol").value) || 50;
+  const ecartsDemiTons = [];
   resultats = planning.map((p, i) => {
     if (p.midi === null) return null;
     const trames = trace.filter(tr => tr.idxNote === i);
-    return Object.assign({ nom: midiVersNom(p.midi) + (p.texte ? " « " + p.texte + " »" : ""), debut: p.debut }, evalueNote(trames, tol));
+    const r = Object.assign({ nom: midiVersNom(p.midi) + (p.texte ? " « " + p.texte + " »" : ""), debut: p.debut }, evalueNote(trames, tol));
+    const med = midiMedian(trames);
+    r.chante = med !== null ? midiVersNom(Math.round(med)) : null;
+    if (med !== null) {
+      let ecart = med - p.midi;
+      if ($("ckOctave").checked) { ecart = ((ecart % 12) + 12) % 12; if (ecart > 6) ecart -= 12; }
+      ecartsDemiTons.push(ecart);
+    } else ecartsDemiTons.push(null);
+    return r;
   });
   const corps = $("tbodyResultats");
   corps.innerHTML = "";
@@ -581,7 +625,7 @@ function calculerResultats() {
       const c = Math.round(r.centsMoyen);
       ecart = (c > 0 ? "+" : "") + c + " cents" + (Math.abs(c) > 25 ? (c > 0 ? " (trop haut)" : " (trop bas)") : "");
     }
-    tr.innerHTML = "<td>" + numero + "</td><td>" + r.nom + "</td><td class='" + cls + "'>" + lib + "</td><td>" +
+    tr.innerHTML = "<td>" + numero + "</td><td>" + r.nom + "</td><td>" + (r.chante || "—") + "</td><td class='" + cls + "'>" + lib + "</td><td>" +
       Math.round(r.ratioJuste * 100) + " %</td><td>" + ecart + "</td>";
     corps.appendChild(tr);
   });
@@ -590,6 +634,18 @@ function calculerResultats() {
     $("verdictGlobal").textContent += " — guide actif : fiable uniquement au casque";
   }
   $("momentsLaches").textContent = laches.length ? "À retravailler : " + laches.join(", ") + "." : "Rien à signaler — tout tient.";
+  const diag = diagnostiquePrise(ecartsDemiTons);
+  let phrase = "";
+  if (diag.type === "ancrage") {
+    const dir = diag.decalage < 0 ? "bas" : "haut";
+    phrase = "Diagnostic : intervalles cohérents mais tout est décalé de " + Math.abs(diag.decalage) +
+      " demi-ton(s) vers le " + dir + ". Ce n'est pas la justesse relative, c'est l'ancrage de la première note — utilise la note de départ avant le décompte.";
+  } else if (diag.type === "intervalles") {
+    phrase = "Diagnostic : écarts irréguliers d'une note à l'autre — les intervalles eux-mêmes sont instables. Travaille les enchaînements deux notes par deux notes, lentement.";
+  } else if (diag.type === "ok") {
+    phrase = "Diagnostic : ancrage et intervalles cohérents.";
+  }
+  if (phrase) $("momentsLaches").textContent += " " + phrase;
   $("secResultats").classList.remove("masque");
 }
 
@@ -675,7 +731,7 @@ function sauver() {
     localStorage.setItem("tenuevoix_v1", JSON.stringify({
       consigne: $("zoneConsigne").value,
       tempo: $("inTempo").value, tol: $("inTol").value, conv: $("selConv").value,
-      octave: $("ckOctave").checked, filtre: $("ckFiltre").checked, guide: $("ckGuide").checked
+      octave: $("ckOctave").checked, filtre: $("ckFiltre").checked, guide: $("ckGuide").checked, depart: $("ckDepart").checked
     }));
   } catch (e) {}
 }
@@ -690,6 +746,7 @@ function restaurer() {
     $("ckOctave").checked = !!s.octave;
     $("ckFiltre").checked = !!s.filtre;
     $("ckGuide").checked = !!s.guide;
+    $("ckDepart").checked = s.depart !== false;
   } catch (e) {}
 }
 
@@ -703,7 +760,7 @@ if (typeof document !== "undefined" && document.getElementById && $("btnCharger"
   $("btnEcouter").addEventListener("click", ecouterCible);
   $("btnRec").addEventListener("click", demarrerRec);
   $("btnStop").addEventListener("click", finSession);
-  ["inTempo", "inTol", "selConv", "ckOctave", "ckFiltre", "ckGuide"].forEach(id =>
+  ["inTempo", "inTol", "selConv", "ckOctave", "ckFiltre", "ckGuide", "ckDepart"].forEach(id =>
     $(id).addEventListener("change", () => { sauver(); if (consigne) { construirePlanning(); dessiner(); } })
   );
   window.addEventListener("resize", () => dessiner());
