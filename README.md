@@ -47,6 +47,14 @@ chante — a cappella ou en jouant — et vois note par note où l'harmonie tien
 
 ## Journal de développement
 
+### 2026-07-25 — v1.5
+- Diagnostic de fin de prise : colonne « Chanté » (note médiane réellement produite par cible)
+  et verdict global ancrage vs intervalles — si les écarts sont cohérents mais décalés,
+  l'appli dit de combien de demi-tons et pointe l'ancrage de la première note, pas la justesse relative.
+- Note de départ jouée 1,2 s avant le décompte (case cochée par défaut) : on ne sort pas
+  un sol#2 du silence. Persistée en localStorage.
+- Motivé par une prise réelle : escalier bien dessiné mais ~3 demi-tons sous les cibles.
+
 ### 2026-07-25 — v1.4
 - Piège identifié en usage réel : guide sonore au haut-parleur → le micro capte le guide,
   l'évaluation note le guide (100 % sans chanter). Avertissement renforcé sur la case,
