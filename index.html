@@ -125,7 +125,7 @@
 <body>
 <header>
   <h1>Tenue de voix</h1>
-  <p>Colle la consigne, chante, vois où ça tient — et où ça lâche. <small style="opacity:.6">v1.2</small></p>
+  <p>Colle la consigne, chante, vois où ça tient — et où ça lâche. <small style="opacity:.6">v1.3</small></p>
 </header>
 <main>
 
@@ -219,9 +219,9 @@ function midiVersNom(midi) {
   return noms[((midi % 12) + 12) % 12] + (Math.floor(midi / 12) - 1);
 }
 
-/** Parse le texte de consigne → { tempo, notes:[{midi|null, beats, brut}] } ou { erreur } */
+/** Parse le texte de consigne → { tempo, notes:[{midi|null, beats, texte, brut}] } ou { erreur } */
 function parseConsigne(texte, convention) {
-  texte = texte.replace(/\u00A0/g, " ");
+  texte = texte.replace(/\u00A0/g, " ").replace(/[\u201C\u201D\u201E\u00AB\u00BB]/g, '"');
   const notes = [];
   let tempo = null;
   const lignes = texte.split(/\r?\n/);
@@ -231,13 +231,13 @@ function parseConsigne(texte, convention) {
     if (!l || l.startsWith("#")) continue;
     const mt = /^TEMPO\s+(\d+)$/i.exec(l);
     if (mt) { tempo = parseInt(mt[1], 10); continue; }
-    const mr = /^REPOS\s+([\d.]+)$/i.exec(l);
-    if (mr) { notes.push({ midi: null, beats: parseFloat(mr[1]), brut: "repos" }); continue; }
-    const mn = /^(\S+)\s+([\d.]+)$/.exec(l);
+    const mr = /^REPOS\s+([\d.]+)(?:\s+"([^"]*)")?$/i.exec(l);
+    if (mr) { notes.push({ midi: null, beats: parseFloat(mr[1]), texte: mr[2] || "", brut: "repos" }); continue; }
+    const mn = /^(\S+)\s+([\d.]+)(?:\s+"([^"]*)")?$/.exec(l);
     if (mn) {
       const midi = nomVersMidi(mn[1], convention);
       if (midi === null) { erreurLigne = "Ligne " + (i + 1) + " : note illisible « " + mn[1] + " »"; break; }
-      notes.push({ midi, beats: parseFloat(mn[2]), brut: mn[1] });
+      notes.push({ midi, beats: parseFloat(mn[2]), texte: mn[3] || "", brut: mn[1] });
       continue;
     }
     erreurLigne = "Ligne " + (i + 1) + " : format non reconnu « " + l + " »";
@@ -246,25 +246,46 @@ function parseConsigne(texte, convention) {
   if (!erreurLigne && notes.filter(n => n.midi !== null).length > 0) {
     return { tempo: tempo || 76, notes };
   }
-  // Repli : le collage a peut-être perdu les retours à la ligne → lecture par jetons.
   const repli = parseJetons(texte, convention);
   if (repli) return repli;
   return { erreur: erreurLigne || "Aucune note dans la consigne." };
 }
 
-/** Lecture par jetons : « TEMPO 76 Sol#2 4 La2 4 … » sur une seule ligne. */
+/** Lecture par jetons : « TEMPO 76 Sol#2 4 "texte" La2 4 … » sur une seule ligne. */
 function parseJetons(texte, convention) {
   const jetons = texte.split(/\s+/).filter(j => j.length);
   const notes = [];
   let tempo = null;
-  for (let i = 0; i < jetons.length - 1; i++) {
+  function litTexte(i) {
+    // consomme des jetons formant "..." à partir de i ; retourne [texte, nouvelIndex]
+    if (i >= jetons.length || !jetons[i].startsWith('"')) return ["", i];
+    let morceaux = [], j = i;
+    while (j < jetons.length) {
+      morceaux.push(jetons[j]);
+      if (jetons[j].endsWith('"') && !(j === i && jetons[j] === '"')) break;
+      j++;
+    }
+    const brut = morceaux.join(" ");
+    return [brut.replace(/^"|"$/g, ""), j + 1];
+  }
+  let i = 0;
+  while (i < jetons.length - 1) {
     const j = jetons[i], suivant = jetons[i + 1];
-    if (/^TEMPO$/i.test(j) && /^\d+$/.test(suivant)) { tempo = parseInt(suivant, 10); i++; continue; }
-    if (/^REPOS$/i.test(j) && /^[\d.]+$/.test(suivant)) { notes.push({ midi: null, beats: parseFloat(suivant), brut: "repos" }); i++; continue; }
+    if (/^TEMPO$/i.test(j) && /^\d+$/.test(suivant)) { tempo = parseInt(suivant, 10); i += 2; continue; }
+    if (/^REPOS$/i.test(j) && /^[\d.]+$/.test(suivant)) {
+      const [txt, apres] = litTexte(i + 2);
+      notes.push({ midi: null, beats: parseFloat(suivant), texte: txt, brut: "repos" });
+      i = apres; continue;
+    }
     if (/^[\d.]+$/.test(suivant)) {
       const midi = nomVersMidi(j, convention);
-      if (midi !== null) { notes.push({ midi, beats: parseFloat(suivant), brut: j }); i++; continue; }
+      if (midi !== null) {
+        const [txt, apres] = litTexte(i + 2);
+        notes.push({ midi, beats: parseFloat(suivant), texte: txt, brut: j });
+        i = apres; continue;
+      }
     }
+    i++;
   }
   if (notes.filter(n => n.midi !== null).length === 0) return null;
   return { tempo: tempo || 76, notes };
@@ -367,8 +388,8 @@ function chargerConsigne() {
     const c = document.createElement("span");
     c.className = "chip";
     c.innerHTML = n.midi === null
-      ? "(repos " + n.beats + "t)"
-      : midiVersNom(n.midi) + " · " + n.beats + "t<br><small>" + midiVersHz(n.midi).toFixed(1) + " Hz</small>";
+      ? "(repos " + n.beats + "t)" + (n.texte ? "<br><small>" + n.texte + "</small>" : "")
+      : midiVersNom(n.midi) + " · " + n.beats + "t<br><small>" + midiVersHz(n.midi).toFixed(1) + " Hz" + (n.texte ? " · " + n.texte : "") + "</small>";
     chips.appendChild(c);
   });
   $("btnEcouter").disabled = false;
@@ -385,7 +406,7 @@ function construirePlanning() {
   let t = 0;
   consigne.notes.forEach(n => {
     const d = n.beats * dureeTemps;
-    planning.push({ midi: n.midi, debut: t, fin: t + d, brut: n.brut });
+    planning.push({ midi: n.midi, debut: t, fin: t + d, brut: n.brut, texte: n.texte || "" });
     t += d;
   });
 }
@@ -541,7 +562,7 @@ function calculerResultats() {
   resultats = planning.map((p, i) => {
     if (p.midi === null) return null;
     const trames = trace.filter(tr => tr.idxNote === i);
-    return Object.assign({ nom: midiVersNom(p.midi), debut: p.debut }, evalueNote(trames, tol));
+    return Object.assign({ nom: midiVersNom(p.midi) + (p.texte ? " « " + p.texte + " »" : ""), debut: p.debut }, evalueNote(trames, tol));
   });
   const corps = $("tbodyResultats");
   corps.innerHTML = "";
@@ -596,7 +617,14 @@ function dessiner(tCourant) {
   }
   // blocs cibles
   planning.forEach(p => {
-    if (p.midi === null) return;
+    if (p.midi === null) {
+      if (p.texte) {
+        ctx2.fillStyle = "#7a6a52";
+        ctx2.font = "italic 10px Work Sans, sans-serif";
+        ctx2.fillText(p.texte, x(p.debut) + 4, H - 6);
+      }
+      return;
+    }
     const h = Math.max(14, (H - 40) / (maxM - minM) * 0.9);
     ctx2.fillStyle = "#c8963e";
     ctx2.fillRect(x(p.debut), y(p.midi) - h / 2, x(p.fin) - x(p.debut) - 2, h);
@@ -605,6 +633,15 @@ function dessiner(tCourant) {
     ctx2.fillStyle = "#fdfaf3";
     ctx2.font = "bold 12px Work Sans, sans-serif";
     ctx2.fillText(midiVersNom(p.midi), x(p.debut) + 4, y(p.midi) + 4);
+    if (p.texte) {
+      ctx2.fillStyle = "#4a3b2a";
+      ctx2.font = "10px Work Sans, sans-serif";
+      let txt = p.texte;
+      const maxL = x(p.fin) - x(p.debut) + 30;
+      while (txt.length > 2 && ctx2.measureText(txt).width > maxL) txt = txt.slice(0, -2);
+      if (txt !== p.texte) txt += "…";
+      ctx2.fillText(txt, x(p.debut) + 2, y(p.midi) + h / 2 + 12);
+    }
   });
   // trace chantée
   const tol = parseFloat($("inTol").value) || 50;
@@ -657,7 +694,7 @@ function restaurer() {
 if (typeof document !== "undefined" && document.getElementById && $("btnCharger")) {
   $("btnCharger").addEventListener("click", chargerConsigne);
   $("btnExemple").addEventListener("click", () => {
-    $("zoneConsigne").value = "# Refrain voix 2 - Je l'aime a mourir (Do)\nTEMPO 76\nSol#2 4\nLa2 4\nSol#2 4\nLa2 4\nSol#2 4\nLa2 6\nSi2 2\nDo3 4";
+    $("zoneConsigne").value = '# Refrain voix 2 - Je l\'aime a mourir (Do)\nTEMPO 76\nREPOS 16 "1er cycle : ecoute"\nSol#2 4 "entree"\nLa2 6 "tenue (Lam + Fa)"\nSi2 2 "monte"\nDo3 4 "unisson"';
     chargerConsigne();
   });
   $("btnEcouter").addEventListener("click", ecouterCible);
