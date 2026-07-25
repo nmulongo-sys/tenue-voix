@@ -47,6 +47,11 @@ chante — a cappella ou en jouant — et vois note par note où l'harmonie tien
 
 ## Journal de développement
 
+### 2026-07-25 — v1.4
+- Piège identifié en usage réel : guide sonore au haut-parleur → le micro capte le guide,
+  l'évaluation note le guide (100 % sans chanter). Avertissement renforcé sur la case,
+  et mention « guide actif : fiable uniquement au casque » dans le verdict global.
+
 ### 2026-07-25 — v1.3
 - Texte à chanter sous chaque bloc : format `Note durée "texte"` (aussi sur REPOS).
   Guillemets typographiques des claviers mobiles tolérés ; fonctionne aussi en collage aplati.
