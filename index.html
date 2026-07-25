@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tenue de voix — évaluateur d'harmonie</title>
+<style>
+  :root {
+    --creme: #f6f1e7;
+    --sepia: #4a3b2a;
+    --sepia-clair: #7a6a52;
+    --ocre: #c8963e;
+    --ocre-pale: #e8d9b8;
+    --vert: #4e7a3a;
+    --rouge: #a53d2e;
+    --blanc-chaud: #fdfaf3;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Work Sans', -apple-system, sans-serif;
+    background: var(--creme);
+    color: var(--sepia);
+    line-height: 1.5;
+    padding: 0 0 4rem 0;
+  }
+  header {
+    text-align: center;
+    padding: 1.6rem 1rem 1rem;
+    border-bottom: 3px double var(--ocre);
+    margin-bottom: 1.2rem;
+  }
+  h1 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 1.9rem;
+    font-weight: 600;
+    letter-spacing: .02em;
+  }
+  header p { color: var(--sepia-clair); font-size: .85rem; margin-top: .2rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 .8rem; }
+  section {
+    background: var(--blanc-chaud);
+    border: 1px solid var(--ocre-pale);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+  h2 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: .6rem;
+    color: var(--sepia);
+  }
+  textarea {
+    width: 100%;
+    min-height: 130px;
+    font-family: ui-monospace, monospace;
+    font-size: .95rem;
+    padding: .6rem;
+    border: 1px solid var(--ocre-pale);
+    border-radius: 8px;
+    background: var(--creme);
+    color: var(--sepia);
+    resize: vertical;
+  }
+  button {
+    font-family: 'Work Sans', sans-serif;
+    font-size: 1rem;
+    padding: .65rem 1.1rem;
+    border: none;
+    border-radius: 8px;
+    background: var(--ocre);
+    color: var(--blanc-chaud);
+    cursor: pointer;
+    margin: .5rem .4rem 0 0;
+    min-height: 44px;
+  }
+  button.secondaire { background: var(--sepia-clair); }
+  button.danger { background: var(--rouge); }
+  button:disabled { opacity: .45; cursor: default; }
+  details { margin-top: .6rem; font-size: .85rem; color: var(--sepia-clair); }
+  details summary { cursor: pointer; color: var(--ocre); font-weight: 500; }
+  details pre {
+    background: var(--creme);
+    padding: .6rem;
+    border-radius: 6px;
+    margin-top: .4rem;
+    overflow-x: auto;
+    font-size: .82rem;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .6rem; }
+  .chip {
+    background: var(--ocre-pale);
+    border-radius: 6px;
+    padding: .25rem .5rem;
+    font-size: .82rem;
+    white-space: nowrap;
+  }
+  .chip small { color: var(--sepia-clair); }
+  .reglages { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem .9rem; font-size: .88rem; }
+  .reglages label { display: flex; align-items: center; gap: .4rem; }
+  .reglages input[type=number] { width: 4.2rem; padding: .25rem; border: 1px solid var(--ocre-pale); border-radius: 5px; background: var(--creme); font-size: .95rem; }
+  .reglages select { padding: .3rem; border: 1px solid var(--ocre-pale); border-radius: 5px; background: var(--creme); font-size: .88rem; max-width: 100%; }
+  .pleine-largeur { grid-column: 1 / -1; }
+  canvas { width: 100%; border: 1px solid var(--ocre-pale); border-radius: 8px; background: var(--blanc-chaud); display: block; }
+  #etat { font-size: .95rem; margin-top: .5rem; min-height: 1.4em; font-weight: 500; }
+  #etat.rec { color: var(--rouge); }
+  table { width: 100%; border-collapse: collapse; font-size: .88rem; margin-top: .5rem; }
+  th, td { text-align: left; padding: .4rem .45rem; border-bottom: 1px solid var(--ocre-pale); }
+  th { font-weight: 600; color: var(--sepia-clair); font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; }
+  .v-tenu { color: var(--vert); font-weight: 600; }
+  .v-instable { color: var(--ocre); font-weight: 600; }
+  .v-faux { color: var(--rouge); font-weight: 600; }
+  .v-muet { color: var(--sepia-clair); }
+  #verdictGlobal {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 1.35rem;
+    text-align: center;
+    padding: .5rem 0 .2rem;
+  }
+  .note-aide { font-size: .8rem; color: var(--sepia-clair); margin-top: .5rem; }
+  .masque { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Tenue de voix</h1>
+  <p>Colle la consigne, chante, vois où ça tient — et où ça lâche.</p>
+</header>
+<main>
+
+<section id="secConsigne">
+  <h2>1 · Consigne</h2>
+  <textarea id="zoneConsigne" placeholder="# Refrain — voix 2&#10;TEMPO 76&#10;Sol#2 4&#10;La2 4&#10;Si2 4&#10;Do3 4"></textarea>
+  <button id="btnCharger">Charger la consigne</button>
+  <details>
+    <summary>Format de la consigne</summary>
+    <pre># commentaire (ignoré)
+TEMPO 76          ← battements par minute
+Sol#2 4           ← note + octave, puis durée en temps
+La2 4
+Sib2 2            ← bémols acceptés (b), dièses (#)
+REPOS 4           ← silence de 4 temps
+Do3 4</pre>
+    <p>Noms français (Do Ré Mi Fa Sol La Si) ou lettres (C D E F G A B).
+    L'octave suit la convention choisie dans les réglages — la fréquence en Hz
+    s'affiche sous chaque note chargée : vérifie-la.</p>
+  </details>
+  <div class="chips" id="chipsNotes"></div>
+</section>
+
+<section id="secReglages">
+  <h2>2 · Réglages</h2>
+  <div class="reglages">
+    <label>Tempo <input type="number" id="inTempo" min="30" max="220" value="76"></label>
+    <label>Tolérance <input type="number" id="inTol" min="10" max="100" value="50"> cents</label>
+    <label class="pleine-largeur">Convention d'octave
+      <select id="selConv">
+        <option value="intl">Internationale (La4 = 440 Hz)</option>
+        <option value="fr">Franco-belge (La3 = 440 Hz)</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="ckOctave"> Ignorer l'octave</label>
+    <label><input type="checkbox" id="ckFiltre"> Je joue un instrument</label>
+    <label class="pleine-largeur"><input type="checkbox" id="ckGuide"> Guide sonore pendant l'enregistrement <small>(au casque !)</small></label>
+  </div>
+  <p class="note-aide">« Je joue un instrument » coupe les fréquences sous ta note cible la plus basse
+  pour que le micro ignore au mieux la basse ou la guitare. « Ignorer l'octave » valide la bonne
+  note chantée dans n'importe quelle octave.</p>
+</section>
+
+<section id="secAction">
+  <h2>3 · Chante</h2>
+  <button id="btnEcouter" disabled>Écouter la cible</button>
+  <button id="btnRec" disabled>S'enregistrer</button>
+  <button id="btnStop" class="danger masque">Arrêter</button>
+  <div id="etat"></div>
+  <canvas id="cv" height="260"></canvas>
+</section>
+
+<section id="secResultats" class="masque">
+  <h2>4 · Résultats</h2>
+  <div id="verdictGlobal"></div>
+  <table>
+    <thead><tr><th>#</th><th>Note</th><th>Verdict</th><th>Justesse</th><th>Écart moyen</th></tr></thead>
+    <tbody id="tbodyResultats"></tbody>
+  </table>
+  <div id="momentsLaches" class="note-aide"></div>
+</section>
+
+</main>
+<script>
+"use strict";
+/* ============================ PURE ============================ */
+/* Fonctions pures : parsing, conversion, évaluation. Testables hors DOM. */
+
+const NOMS_FR = { "do":0, "re":2, "ré":2, "mi":4, "fa":5, "sol":7, "la":9, "si":11 };
+const NOMS_EN = { "c":0, "d":2, "e":4, "f":5, "g":7, "a":9, "b":11 };
+
+/** Nom de note ("Sol#2", "Bb3", "réb4") + convention → midi international, ou null. */
+function nomVersMidi(txt, convention) {
+  const m = /^([a-zA-Zéè]+?)([#b]?)(-?\d+)$/.exec(txt.trim());
+  if (!m) return null;
+  const nom = m[1].toLowerCase();
+  let demi = (nom in NOMS_FR) ? NOMS_FR[nom] : (nom in NOMS_EN ? NOMS_EN[nom] : null);
+  if (demi === null) return null;
+  if (m[2] === "#") demi += 1;
+  if (m[2] === "b") demi -= 1;
+  let octave = parseInt(m[3], 10);
+  if (convention === "fr") octave += 1; // La3 franco-belge = A4 international
+  return 12 * (octave + 1) + demi;
+}
+
+function midiVersHz(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
+
+function midiVersNom(midi) {
+  const noms = ["Do","Do#","Ré","Ré#","Mi","Fa","Fa#","Sol","Sol#","La","La#","Si"];
+  return noms[((midi % 12) + 12) % 12] + (Math.floor(midi / 12) - 1);
+}
+
+/** Parse le texte de consigne → { tempo, notes:[{midi|null, beats, brut}] } ou { erreur } */
+function parseConsigne(texte, convention) {
+  const notes = [];
+  let tempo = null;
+  const lignes = texte.split(/\r?\n/);
+  for (let i = 0; i < lignes.length; i++) {
+    const l = lignes[i].trim();
+    if (!l || l.startsWith("#")) continue;
+    const mt = /^TEMPO\s+(\d+)$/i.exec(l);
+    if (mt) { tempo = parseInt(mt[1], 10); continue; }
+    const mr = /^REPOS\s+([\d.]+)$/i.exec(l);
+    if (mr) { notes.push({ midi: null, beats: parseFloat(mr[1]), brut: "repos" }); continue; }
+    const mn = /^(\S+)\s+([\d.]+)$/.exec(l);
+    if (mn) {
+      const midi = nomVersMidi(mn[1], convention);
+      if (midi === null) return { erreur: "Ligne " + (i + 1) + " : note illisible « " + mn[1] + " »" };
+      notes.push({ midi, beats: parseFloat(mn[2]), brut: mn[1] });
+      continue;
+    }
+    return { erreur: "Ligne " + (i + 1) + " : format non reconnu « " + l + " »" };
+  }
+  if (notes.filter(n => n.midi !== null).length === 0) return { erreur: "Aucune note dans la consigne." };
+  return { tempo: tempo || 76, notes };
+}
+
+/** Écart en cents entre une fréquence chantée et un midi cible (option modulo octave). */
+function ecartCents(freq, midiCible, ignorerOctave) {
+  if (!freq || freq <= 0) return null;
+  const midiChante = 69 + 12 * Math.log2(freq / 440);
+  let d = midiChante - midiCible;
+  if (ignorerOctave) {
+    d = ((d % 12) + 12) % 12;
+    if (d > 6) d -= 12;
+  }
+  return d * 100;
+}
+
+/** Évalue les trames d'une note → { verdict, ratioJuste, ratioVoise, centsMoyen } */
+function evalueNote(trames, tolCents) {
+  const voisees = trames.filter(t => t.cents !== null);
+  const ratioVoise = trames.length ? voisees.length / trames.length : 0;
+  if (ratioVoise < 0.3) return { verdict: "muet", ratioJuste: 0, ratioVoise, centsMoyen: null };
+  const justes = voisees.filter(t => Math.abs(t.cents) <= tolCents);
+  const ratioJuste = justes.length / voisees.length;
+  const centsMoyen = voisees.reduce((s, t) => s + t.cents, 0) / voisees.length;
+  let verdict = "faux";
+  if (ratioJuste >= 0.7) verdict = "tenu";
+  else if (ratioJuste >= 0.4) verdict = "instable";
+  return { verdict, ratioJuste, ratioVoise, centsMoyen };
+}
+
+/** Détection de hauteur YIN sur un buffer temporel. Retourne Hz ou null. */
+function yin(buf, sampleRate, seuil) {
+  seuil = seuil || 0.15;
+  const n = buf.length;
+  const tauMax = Math.floor(n / 2);
+  const d = new Float32Array(tauMax);
+  for (let tau = 1; tau < tauMax; tau++) {
+    let somme = 0;
+    for (let i = 0; i < tauMax; i++) {
+      const delta = buf[i] - buf[i + tau];
+      somme += delta * delta;
+    }
+    d[tau] = somme;
+  }
+  const cmnd = new Float32Array(tauMax);
+  cmnd[0] = 1;
+  let cumul = 0;
+  for (let tau = 1; tau < tauMax; tau++) {
+    cumul += d[tau];
+    cmnd[tau] = cumul ? d[tau] * tau / cumul : 1;
+  }
+  let tauTrouve = -1;
+  for (let tau = 2; tau < tauMax; tau++) {
+    if (cmnd[tau] < seuil) {
+      while (tau + 1 < tauMax && cmnd[tau + 1] < cmnd[tau]) tau++;
+      tauTrouve = tau;
+      break;
+    }
+  }
+  if (tauTrouve === -1) return null;
+  // interpolation parabolique
+  let t = tauTrouve;
+  if (t > 0 && t < tauMax - 1) {
+    const a = cmnd[t - 1], b = cmnd[t], c = cmnd[t + 1];
+    const denom = 2 * (a - 2 * b + c);
+    if (Math.abs(denom) > 1e-12) t = t + (a - c) / denom;
+  }
+  const freq = sampleRate / t;
+  return (freq >= 50 && freq <= 1200) ? freq : null;
+}
+/* ============================ ENDPURE ============================ */
+
+/* ---------- État global ---------- */
+let consigne = null;          // { tempo, notes }
+let planning = null;          // [{midi, debut, fin, brut}] en secondes (repos inclus, midi=null)
+let trace = [];               // [{t, freq, cents, idxNote}]
+let resultats = null;
+let audioCtx = null;
+let micStream = null, analyseur = null, filtre = null;
+let enCours = null;           // "ecoute" | "rec" | null
+let t0 = 0;                   // ctx.currentTime au début de la séquence (après décompte)
+let rafId = null;
+let noeudsGuide = [];
+
+const $ = id => document.getElementById(id);
+
+/* ---------- Chargement consigne ---------- */
+function chargerConsigne() {
+  const conv = $("selConv").value;
+  const res = parseConsigne($("zoneConsigne").value, conv);
+  if (res.erreur) { $("etat").textContent = res.erreur; $("etat").className = "rec"; return; }
+  consigne = res;
+  $("inTempo").value = consigne.tempo;
+  $("etat").textContent = "Consigne chargée : " + consigne.notes.filter(n => n.midi !== null).length + " notes.";
+  $("etat").className = "";
+  const chips = $("chipsNotes");
+  chips.innerHTML = "";
+  consigne.notes.forEach(n => {
+    const c = document.createElement("span");
+    c.className = "chip";
+    c.innerHTML = n.midi === null
+      ? "(repos " + n.beats + "t)"
+      : midiVersNom(n.midi) + " · " + n.beats + "t<br><small>" + midiVersHz(n.midi).toFixed(1) + " Hz</small>";
+    chips.appendChild(c);
+  });
+  $("btnEcouter").disabled = false;
+  $("btnRec").disabled = false;
+  sauver();
+  construirePlanning();
+  dessiner();
+}
+
+function construirePlanning() {
+  const tempo = parseFloat($("inTempo").value) || consigne.tempo;
+  const dureeTemps = 60 / tempo;
+  planning = [];
+  let t = 0;
+  consigne.notes.forEach(n => {
+    const d = n.beats * dureeTemps;
+    planning.push({ midi: n.midi, debut: t, fin: t + d, brut: n.brut });
+    t += d;
+  });
+}
+
+/* ---------- Audio ---------- */
+function ctx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  return audioCtx;
+}
+
+function jouerClic(quand, accentue) {
+  const c = ctx();
+  const o = c.createOscillator(), g = c.createGain();
+  o.frequency.value = accentue ? 1100 : 800;
+  g.gain.setValueAtTime(0.25, quand);
+  g.gain.exponentialRampToValueAtTime(0.001, quand + 0.07);
+  o.connect(g).connect(c.destination);
+  o.start(quand); o.stop(quand + 0.09);
+  noeudsGuide.push(o);
+}
+
+function jouerGuide(depart, gain) {
+  const c = ctx();
+  planning.forEach(p => {
+    if (p.midi === null) return;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = "triangle";
+    o.frequency.value = midiVersHz(p.midi);
+    const a = depart + p.debut, b = depart + p.fin;
+    g.gain.setValueAtTime(0.0001, a);
+    g.gain.exponentialRampToValueAtTime(gain, a + 0.04);
+    g.gain.setValueAtTime(gain, Math.max(a + 0.04, b - 0.06));
+    g.gain.exponentialRampToValueAtTime(0.0001, b);
+    o.connect(g).connect(c.destination);
+    o.start(a); o.stop(b + 0.05);
+    noeudsGuide.push(o);
+  });
+}
+
+function couperGuide() {
+  noeudsGuide.forEach(o => { try { o.stop(); } catch (e) {} });
+  noeudsGuide = [];
+}
+
+/* ---------- Écoute de la cible ---------- */
+function ecouterCible() {
+  if (enCours) return;
+  construirePlanning();
+  enCours = "ecoute";
+  const depart = ctx().currentTime + 0.15;
+  t0 = depart;
+  jouerGuide(depart, 0.28);
+  $("etat").textContent = "Lecture de la cible…";
+  $("btnStop").classList.remove("masque");
+  boucleAffichage(false);
+  const dureeTotale = planning[planning.length - 1].fin;
+  setTimeout(finSession, (dureeTotale + 0.5) * 1000);
+}
+
+/* ---------- Enregistrement ---------- */
+async function demarrerRec() {
+  if (enCours) return;
+  construirePlanning();
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+  } catch (e) {
+    $("etat").textContent = "Micro refusé : autorise l'accès (HTTPS requis).";
+    $("etat").className = "rec";
+    return;
+  }
+  const c = ctx();
+  const src = c.createMediaStreamSource(micStream);
+  analyseur = c.createAnalyser();
+  analyseur.fftSize = 4096;
+  if ($("ckFiltre").checked) {
+    const minHz = Math.min(...planning.filter(p => p.midi !== null).map(p => midiVersHz(p.midi)));
+    filtre = c.createBiquadFilter();
+    filtre.type = "highpass";
+    filtre.frequency.value = Math.max(60, minHz * 0.72);
+    filtre.Q.value = 0.7;
+    src.connect(filtre).connect(analyseur);
+  } else {
+    filtre = null;
+    src.connect(analyseur);
+  }
+
+  trace = [];
+  resultats = null;
+  $("secResultats").classList.add("masque");
+  enCours = "rec";
+  $("btnStop").classList.remove("masque");
+
+  // décompte : 4 temps
+  const tempo = parseFloat($("inTempo").value) || consigne.tempo;
+  const bat = 60 / tempo;
+  const maintenant = c.currentTime + 0.2;
+  for (let i = 0; i < 4; i++) jouerClic(maintenant + i * bat, i === 0);
+  t0 = maintenant + 4 * bat;
+  if ($("ckGuide").checked) jouerGuide(t0, 0.12);
+
+  $("etat").textContent = "Décompte… puis chante !";
+  $("etat").className = "rec";
+  boucleAffichage(true);
+}
+
+function boucleAffichage(analyse) {
+  const buf = analyse ? new Float32Array(analyseur.fftSize) : null;
+  const dureeTotale = planning[planning.length - 1].fin;
+  function pas() {
+    const t = ctx().currentTime - t0;
+    if (analyse && t >= 0 && t <= dureeTotale) {
+      analyseur.getFloatTimeDomainData(buf);
+      // seuil d'énergie : ignore le silence
+      let rms = 0;
+      for (let i = 0; i < buf.length; i++) rms += buf[i] * buf[i];
+      rms = Math.sqrt(rms / buf.length);
+      let freq = rms > 0.008 ? yin(buf, ctx().sampleRate) : null;
+      const idx = planning.findIndex(p => t >= p.debut && t < p.fin);
+      let cents = null;
+      if (idx >= 0 && planning[idx].midi !== null) {
+        cents = ecartCents(freq, planning[idx].midi, $("ckOctave").checked);
+      }
+      trace.push({ t, freq, cents, idxNote: idx });
+    }
+    dessiner(t);
+    if (enCours === "rec" && t > dureeTotale + 0.3) { finSession(); return; }
+    if (enCours) rafId = requestAnimationFrame(pas);
+  }
+  rafId = requestAnimationFrame(pas);
+}
+
+function finSession() {
+  const etait = enCours;
+  enCours = null;
+  if (rafId) cancelAnimationFrame(rafId);
+  couperGuide();
+  if (micStream) { micStream.getTracks().forEach(tr => tr.stop()); micStream = null; }
+  $("btnStop").classList.add("masque");
+  $("etat").className = "";
+  if (etait === "rec" && trace.length) {
+    calculerResultats();
+    $("etat").textContent = "Prise terminée.";
+  } else {
+    $("etat").textContent = "";
+  }
+  dessiner();
+}
+
+/* ---------- Résultats ---------- */
+function calculerResultats() {
+  const tol = parseFloat($("inTol").value) || 50;
+  resultats = planning.map((p, i) => {
+    if (p.midi === null) return null;
+    const trames = trace.filter(tr => tr.idxNote === i);
+    return Object.assign({ nom: midiVersNom(p.midi), debut: p.debut }, evalueNote(trames, tol));
+  });
+  const corps = $("tbodyResultats");
+  corps.innerHTML = "";
+  const laches = [];
+  let numero = 0, tenues = 0, total = 0;
+  resultats.forEach((r, i) => {
+    if (!r) return;
+    numero++; total++;
+    if (r.verdict === "tenu") tenues++;
+    else laches.push("mesure ~" + (Math.floor(planning[i].debut / (60 / (parseFloat($("inTempo").value) || 76) * 4)) + 1) + " (" + r.nom + ")");
+    const tr = document.createElement("tr");
+    const libelles = { tenu: ["✔ tenu", "v-tenu"], instable: ["≈ instable", "v-instable"], faux: ["✘ faux", "v-faux"], muet: ["— non chanté", "v-muet"] };
+    const [lib, cls] = libelles[r.verdict];
+    let ecart = "—";
+    if (r.centsMoyen !== null) {
+      const c = Math.round(r.centsMoyen);
+      ecart = (c > 0 ? "+" : "") + c + " cents" + (Math.abs(c) > 25 ? (c > 0 ? " (trop haut)" : " (trop bas)") : "");
+    }
+    tr.innerHTML = "<td>" + numero + "</td><td>" + r.nom + "</td><td class='" + cls + "'>" + lib + "</td><td>" +
+      Math.round(r.ratioJuste * 100) + " %</td><td>" + ecart + "</td>";
+    corps.appendChild(tr);
+  });
+  $("verdictGlobal").textContent = tenues + " / " + total + " notes tenues";
+  $("momentsLaches").textContent = laches.length ? "À retravailler : " + laches.join(", ") + "." : "Rien à signaler — tout tient.";
+  $("secResultats").classList.remove("masque");
+}
+
+/* ---------- Dessin ---------- */
+function dessiner(tCourant) {
+  const cv = $("cv");
+  const ctx2 = cv.getContext && cv.getContext("2d");
+  if (!ctx2) return;
+  const largeurCss = cv.clientWidth || 600;
+  if (cv.width !== largeurCss * devicePixelRatio) {
+    cv.width = largeurCss * devicePixelRatio;
+    cv.height = 260 * devicePixelRatio;
+  }
+  ctx2.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  const W = largeurCss, H = 260;
+  ctx2.clearRect(0, 0, W, H);
+  if (!planning) return;
+  const midis = planning.filter(p => p.midi !== null).map(p => p.midi);
+  const minM = Math.min(...midis) - 3, maxM = Math.max(...midis) + 3;
+  const dureeTotale = planning[planning.length - 1].fin;
+  const x = t => 10 + (t / dureeTotale) * (W - 20);
+  const y = midi => H - 20 - ((midi - minM) / (maxM - minM)) * (H - 40);
+
+  // lignes de demi-tons
+  ctx2.strokeStyle = "#efe6d2";
+  for (let m = Math.ceil(minM); m <= maxM; m++) {
+    ctx2.beginPath(); ctx2.moveTo(10, y(m)); ctx2.lineTo(W - 10, y(m)); ctx2.stroke();
+  }
+  // blocs cibles
+  planning.forEach(p => {
+    if (p.midi === null) return;
+    ctx2.fillStyle = "#e8d9b8";
+    ctx2.strokeStyle = "#c8963e";
+    const h = Math.max(6, (H - 40) / (maxM - minM) * 0.9);
+    ctx2.fillRect(x(p.debut), y(p.midi) - h / 2, x(p.fin) - x(p.debut) - 2, h);
+    ctx2.strokeRect(x(p.debut), y(p.midi) - h / 2, x(p.fin) - x(p.debut) - 2, h);
+    ctx2.fillStyle = "#7a6a52";
+    ctx2.font = "11px Work Sans, sans-serif";
+    ctx2.fillText(midiVersNom(p.midi), x(p.debut) + 3, y(p.midi) - h / 2 - 3);
+  });
+  // trace chantée
+  const tol = parseFloat($("inTol").value) || 50;
+  const ignorerOct = $("ckOctave").checked;
+  trace.forEach(tr => {
+    if (!tr.freq) return;
+    let midiAff = 69 + 12 * Math.log2(tr.freq / 440);
+    if (ignorerOct && tr.idxNote >= 0 && planning[tr.idxNote].midi !== null) {
+      // replie l'affichage près de la cible
+      const cible = planning[tr.idxNote].midi;
+      while (midiAff - cible > 6) midiAff -= 12;
+      while (cible - midiAff > 6) midiAff += 12;
+    }
+    if (midiAff < minM || midiAff > maxM) return;
+    ctx2.fillStyle = (tr.cents !== null && Math.abs(tr.cents) <= tol) ? "#4e7a3a" : "#a53d2e";
+    ctx2.fillRect(x(tr.t) - 1, y(midiAff) - 1.5, 3, 3);
+  });
+  // curseur
+  if (enCours && tCourant >= 0 && tCourant <= dureeTotale) {
+    ctx2.strokeStyle = "#a53d2e";
+    ctx2.beginPath(); ctx2.moveTo(x(tCourant), 8); ctx2.lineTo(x(tCourant), H - 8); ctx2.stroke();
+  }
+}
+
+/* ---------- Persistance ---------- */
+function sauver() {
+  try {
+    localStorage.setItem("tenuevoix_v1", JSON.stringify({
+      consigne: $("zoneConsigne").value,
+      tempo: $("inTempo").value, tol: $("inTol").value, conv: $("selConv").value,
+      octave: $("ckOctave").checked, filtre: $("ckFiltre").checked, guide: $("ckGuide").checked
+    }));
+  } catch (e) {}
+}
+function restaurer() {
+  try {
+    const s = JSON.parse(localStorage.getItem("tenuevoix_v1") || "null");
+    if (!s) return;
+    $("zoneConsigne").value = s.consigne || "";
+    $("inTempo").value = s.tempo || 76;
+    $("inTol").value = s.tol || 50;
+    $("selConv").value = s.conv || "intl";
+    $("ckOctave").checked = !!s.octave;
+    $("ckFiltre").checked = !!s.filtre;
+    $("ckGuide").checked = !!s.guide;
+  } catch (e) {}
+}
+
+/* ---------- Liaisons ---------- */
+if (typeof document !== "undefined" && document.getElementById && $("btnCharger")) {
+  $("btnCharger").addEventListener("click", chargerConsigne);
+  $("btnEcouter").addEventListener("click", ecouterCible);
+  $("btnRec").addEventListener("click", demarrerRec);
+  $("btnStop").addEventListener("click", finSession);
+  ["inTempo", "inTol", "selConv", "ckOctave", "ckFiltre", "ckGuide"].forEach(id =>
+    $(id).addEventListener("change", () => { sauver(); if (consigne) { construirePlanning(); dessiner(); } })
+  );
+  window.addEventListener("resize", () => dessiner());
+  restaurer();
+  if ($("zoneConsigne").value.trim()) chargerConsigne();
+}
+</script>
+</body>
+</html>
